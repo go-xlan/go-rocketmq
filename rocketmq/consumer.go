@@ -40,7 +40,7 @@ func (c *ConsumerClient) Close() {
 	must.Done(c.mqConsumer.Shutdown())
 }
 
-func (c *ConsumerClient) StartReceiveMessage(topic string) error {
+func (c *ConsumerClient) StartConsume(topic string, consumeFunc func(msg *primitive.MessageExt) (consumer.ConsumeResult, error)) error {
 	if err := c.mqConsumer.Start(); err != nil {
 		return erero.Wro(err)
 	}
@@ -52,7 +52,9 @@ func (c *ConsumerClient) StartReceiveMessage(topic string) error {
 	}, func(ctx context.Context, msgs ...*primitive.MessageExt) (consumer.ConsumeResult, error) {
 		for _, msg := range msgs {
 			zaplog.LOG.Debug("consume message", zap.String("msgID", msg.MsgId))
-			zaplog.SUG.Debugln("message:", string(msg.Body))
+			if result, err := consumeFunc(msg); err != nil {
+				return result, erero.Wro(err)
+			}
 		}
 		return consumer.ConsumeSuccess, nil
 	}); err != nil {
