@@ -15,36 +15,36 @@ import (
 
 func main() {
 	config := &rocketmq.Config{
-		NameServer: "127.0.0.1:9876",
-		GroupName:  "TestGroup",
-		Producer: &rocketmq.ProducerConfig{
-			SendMsgTimeout: 3000,
-			RetryTimes:     3,
+		NameServerAddress: "127.0.0.1:9876",
+		GroupName:         "TestGroup",
+		ProducerOptions: &rocketmq.ProducerOptions{
+			SendMessageTimeout: 3 * time.Second,
+			RetryAttempts:      3,
 		},
 	}
 
 	const topic = "TestTopic"
 
-	consumerClient := rese.P1(rocketmq.NewConsumerClient(config))
-	defer consumerClient.Close()
-	must.Done(consumerClient.StartConsume(topic, func(msg *primitive.MessageExt) (consumer.ConsumeResult, error) {
-		zaplog.SUG.Debugln("message:", string(msg.Body))
+	consumerCli := rese.P1(rocketmq.NewConsumer(config))
+	defer rese.F0(consumerCli.Close)
+	must.Done(consumerCli.StartSubscribe(topic, func(message *primitive.MessageExt) (consumer.ConsumeResult, error) {
+		zaplog.SUG.Debugln("consume message body:", string(message.Body))
 		return consumer.ConsumeSuccess, nil
 	}))
 
-	producerClient := rese.P1(rocketmq.NewProducerClient(config))
-	defer producerClient.Close()
-	for i := 0; i < 10000; i++ {
-		type MessageType struct {
+	producerCli := rese.P1(rocketmq.NewProducer(config))
+	defer rese.F0(producerCli.Close)
+	for idx := 0; idx < 10000; idx++ {
+		type MessagePayload struct {
 			Name       string `json:"name"`
 			SequenceNo int64  `json:"sequenceNo"`
 		}
 
-		message := neatjsons.S(&MessageType{
+		payload := neatjsons.S(&MessagePayload{
 			Name:       "demo",
-			SequenceNo: int64(i),
+			SequenceNo: int64(idx),
 		})
-		must.Done(producerClient.SendMsg(context.Background(), topic, []byte(message)))
+		must.Done(producerCli.SendMessage(context.Background(), topic, []byte(payload)))
 		time.Sleep(time.Second)
 	}
 
